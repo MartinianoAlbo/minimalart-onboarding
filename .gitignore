@@ -1,0 +1,4 @@
+target/
+*.class
+config.properties
+dependency-reduced-pom.xml

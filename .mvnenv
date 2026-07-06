@@ -1,0 +1,4 @@
+# Source this before running mvn/java in a fresh (non-interactive) shell.
+# The SDKMAN-managed Java 17 + Maven live behind these stable symlinks.
+export JAVA_HOME="$HOME/.sdkman/candidates/java/current"
+export PATH="$HOME/.sdkman/candidates/maven/current/bin:$JAVA_HOME/bin:$PATH"

@@ -1,0 +1,73 @@
+name: Build native apps
+
+# Runs manually (Actions -> Run workflow) or when a version tag is pushed (v*).
+# It does NOT run on every push, to avoid spending macOS runner minutes.
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            script: bash packaging/package-linux.sh
+            artifact: ArcorOnboarding-linux.tar.gz
+          - os: macos-latest
+            script: bash packaging/package-macos.sh
+            artifact: ArcorOnboarding-macos.zip
+          - os: windows-latest
+            script: packaging\package-windows.bat
+            artifact: ArcorOnboarding-windows.zip
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17 (Temurin, provides jpackage)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Package (Unix)
+        if: runner.os != 'Windows'
+        run: ${{ matrix.script }}
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: ${{ matrix.script }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: target/dist/${{ matrix.artifact }}
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all built artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Create Release with the three apps
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" artifacts/*/* \
+            --repo "${{ github.repository }}" \
+            --title "${{ github.ref_name }}" \
+            --generate-notes
